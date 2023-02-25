@@ -1,70 +1,61 @@
-import { createContext, useEffect, useState } from 'react';
-import ReactLoading from 'react-loading';
+import { createContext } from 'react';
 import { parseCookies, destroyCookie } from 'nookies';
 import { useNavigate } from 'react-router-dom';
 import { getUser, signIn } from '../service/api';
 import { Session } from '../types';
+import { useQueryClient, useMutation, useQuery } from 'react-query';
 
 interface IAuthContext {
   children: React.ReactNode;
 }
 
 interface IAuthContextData {
-  handleSignIn(username: string, password: string): Promise<void>;
+  handleSignIn({ username, password }: { username: string; password: string }): void;
   handleSignOut(): void;
-  session: Session | null;
-  isAdmin: boolean | null;
+  session: Session | null | undefined;
+  isAdmin: boolean;
+  isLoading: boolean;
 }
 
 const AuthContext = createContext<IAuthContextData>({} as IAuthContextData);
 
 export const AuthProvider: React.FC<IAuthContext> = ({ children }) => {
-  const [session, setSession] = useState<Session | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const cookies = parseCookies();
 
-  const isAdmin = session && session.user.role === 'admin';
+  const { data: session, isLoading: isSessionLoading } = useQuery('session', getUser, {
+    retry: 0,
+    refetchOnWindowFocus: false,
+    enabled: !!cookies['session_token'],
+    onError() {
+      handleSignOut();
+    },
+  });
 
-  useEffect(() => {
-    const getSession = async () => {
-      const cookies = parseCookies();
+  const isAdmin = !!session && session.user.role === 'admin';
 
-      const sessionToken = cookies['session_token'];
-
-      if (sessionToken && !session) {
-        const response = await getUser();
-        setSession(response.data);
-      }
-
-      setIsLoading(false);
-    };
-
-    getSession();
-  }, [session]);
-
-  const handleSignIn = async (username: string, password: string) => {
-    try {
-      const response = await signIn(username, password);
-      setSession(response.data);
-
-      navigate('/');
-    } catch (error) {
-      console.log({ error });
-    }
-  };
+  const { isLoading, mutate: handleSignIn } = useMutation(signIn, {
+    onSuccess: () => {
+      navigate('/', { replace: true });
+    },
+    onError: (err) => {
+      console.log(err);
+    },
+  });
 
   const handleSignOut = () => {
     destroyCookie(null, 'session_token');
-    setSession(null);
+    queryClient.removeQueries('session');
     navigate('/');
   };
 
-  if (isLoading) {
+  if (isSessionLoading) {
     return <p>Loading...</p>;
   }
 
   return (
-    <AuthContext.Provider value={{ session, isAdmin, handleSignIn, handleSignOut }}>
+    <AuthContext.Provider value={{ session, isAdmin, handleSignIn, handleSignOut, isLoading }}>
       {children}
     </AuthContext.Provider>
   );
