@@ -13,14 +13,17 @@ interface IAuthContextData {
   handleSignIn(username: string, password: string): Promise<void>;
   handleSignOut(): void;
   session: Session | null;
+  isAdmin: boolean | null;
 }
 
 const AuthContext = createContext<IAuthContextData>({} as IAuthContextData);
 
 export const AuthProvider: React.FC<IAuthContext> = ({ children }) => {
-  const [session, setSession] = useState(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
+
+  const isAdmin = session && session.user.role === 'admin';
 
   useEffect(() => {
     const getSession = async () => {
@@ -61,7 +64,7 @@ export const AuthProvider: React.FC<IAuthContext> = ({ children }) => {
   }
 
   return (
-    <AuthContext.Provider value={{ session, handleSignIn, handleSignOut }}>
+    <AuthContext.Provider value={{ session, isAdmin, handleSignIn, handleSignOut }}>
       {children}
     </AuthContext.Provider>
   );

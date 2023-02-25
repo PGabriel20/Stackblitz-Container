@@ -3,7 +3,10 @@ const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
+require('dotenv').config()
   
+const jwtSecret = process.env.AUTH_SECRET
+
 const app = express();
 
 app.use(express.json())
@@ -44,7 +47,7 @@ app.post('/login', (req, res) => {
     //creating a access token
     const accessToken = jwt.sign({
         uid: user.uid,
-    }, "ACCESS TOKEN SECRET", {
+    }, jwtSecret, {
         expiresIn: '10m'
     });
 
@@ -71,7 +74,7 @@ app.get('/me', (req, res) => {
     const sessionToken = req.cookies.session_token;
 
     // Verifying refresh token
-    jwt.verify(sessionToken, "ACCESS TOKEN SECRET", 
+    jwt.verify(sessionToken, jwtSecret, 
       (err, decoded) => {
         if (err) {
 
@@ -89,7 +92,7 @@ app.get('/me', (req, res) => {
           // Correct token we send a new access token
           setTimeout(() => {
             return res.json({ user });
-          }, 300)
+          }, 0)
         }
       })
   } else {
